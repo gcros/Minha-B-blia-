@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bookmark
@@ -137,8 +138,7 @@ fun HomeScreen(onOpenBible: () -> Unit = {}, onListen: () -> Unit = {}, onSearch
         Spacer(Modifier.size(20.dp))
 
         Text(
-            "“Lâmpada para os meus pés é tua palavra,
-e luz para o meu caminho.”",
+            "“Lâmpada para os meus pés é tua palavra,\ne luz para o meu caminho.”",
             color = Cafe,
             fontSize = 16.sp,
             lineHeight = 24.sp,
