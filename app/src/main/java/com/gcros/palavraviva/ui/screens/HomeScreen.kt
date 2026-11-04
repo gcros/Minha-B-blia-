@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.gcros.palavraviva.ui.theme.*
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(onOpenBible: () -> Unit = {}, onListen: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -119,7 +119,7 @@ fun HomeScreen() {
         Spacer(Modifier.size(18.dp))
 
         Button(
-            onClick = { /* TODO: abrir livros */ },
+            onClick = onOpenBible,
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(Icons.Outlined.MenuBook, null)
@@ -127,7 +127,7 @@ fun HomeScreen() {
         }
 
         OutlinedButton(
-            onClick = { /* TODO: abrir áudio */ },
+            onClick = onListen,
             modifier = Modifier.fillMaxWidth()
         ) {
             Icon(Icons.Outlined.Headphones, null)
