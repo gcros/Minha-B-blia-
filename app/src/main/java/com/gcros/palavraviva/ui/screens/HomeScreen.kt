@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.gcros.palavraviva.ui.theme.*
 
 @Composable
-fun HomeScreen(onOpenBible: () -> Unit = {}, onListen: () -> Unit = {}) {
+fun HomeScreen(onOpenBible: () -> Unit = {}, onListen: () -> Unit = {}, onSearch: () -> Unit = {}, onFavorites: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -61,10 +61,10 @@ fun HomeScreen(onOpenBible: () -> Unit = {}, onListen: () -> Unit = {}) {
                     fontWeight = FontWeight.Bold
                 )
             }
-            IconButton(onClick = { /* TODO: busca */ }) {
+            IconButton(onClick = onSearch) {
                 Icon(Icons.Outlined.Search, "Buscar", tint = MarromProfundo)
             }
-            IconButton(onClick = { /* TODO: favoritos */ }) {
+            IconButton(onClick = onFavorites) {
                 Icon(Icons.Outlined.Bookmark, "Favoritos", tint = MarromProfundo)
             }
         }
