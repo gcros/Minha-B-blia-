@@ -26,6 +26,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+      - name: Download Bíblia BPM offline source
+        run: |
+          mkdir -p app/src/main/assets
+          curl -fL --retry 3 --retry-delay 2 https://ebible.org/Scriptures/porbrbsl_readaloud.zip -o /tmp/porbrbsl_readaloud.zip
+          echo '--- BPM archive contents ---'
+          unzip -l /tmp/porbrbsl_readaloud.zip | head -45
+          cp /tmp/porbrbsl_readaloud.zip app/src/main/assets/porbrbsl_readaloud.zip
       - name: Build debug APK
         run: gradle assembleDebug
       - name: Upload APK
