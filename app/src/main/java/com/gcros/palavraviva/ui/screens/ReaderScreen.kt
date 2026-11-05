@@ -15,6 +15,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
 import java.util.zip.ZipInputStream
 
 private data class BibleVerse(val number: Int, val text: String)
@@ -61,15 +63,13 @@ private suspend fun loadBibleChapter(
     val code = bookCodes[book.name]
         ?: throw IllegalArgumentException("Código do livro não encontrado: ${book.name}")
 
-    val expectedSuffix = "_${code}_${chapter.toString().padStart(2, '0')}_read.txt"
-    var chapterText: String? = null
-
-    context.assets.open("porbrbsl_readaloud.zip").use { asset ->
+    var usfmText: String? = null
+    context.assets.open("porbrbsl_usfm.zip").use { asset ->
         ZipInputStream(asset).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
-                if (!entry.isDirectory && entry.name.endsWith(expectedSuffix)) {
-                    chapterText = zip.readBytes().toString(Charsets.UTF_8)
+                if (!entry.isDirectory && entry.name.endsWith("_$code.usfm", ignoreCase = true)) {
+                    usfmText = zip.readBytes().toString(Charsets.UTF_8)
                     break
                 }
                 zip.closeEntry()
@@ -78,30 +78,68 @@ private suspend fun loadBibleChapter(
         }
     }
 
-    val rawText = chapterText
-        ?: throw IllegalStateException(
-            "Capítulo não encontrado no arquivo offline: ${book.name} $chapter."
-        )
+    val source = usfmText
+        ?: throw IllegalStateException("O livro ${book.name} não foi encontrado no arquivo bíblico offline.")
 
-    val lines = rawText.removePrefix("\uFEFF")
-        .lines()
-        .map { it.trim() }
+    val verses = linkedMapOf<Int, StringBuilder>()
+    var currentChapter = 0
+    var currentVerse: Int? = null
 
-    val chapterMarker = lines.indexOfFirst { it.matches(Regex("^$chapter\\.$")) }
-    if (chapterMarker < 0) {
-        throw IllegalStateException("O arquivo de ${book.name} $chapter tem formato inesperado.")
+    val chapterPattern = Regex("""^\\c\\s+(\\d+)""")
+    val versePattern = Regex("""^\\v\\s+(\\d+)(?:-\\d+)?\\s*(.*)$""")
+
+    source.removePrefix("\uFEFF").lineSequence().forEach { rawLine ->
+        val line = rawLine.trim()
+        if (line.isEmpty()) return@forEach
+
+        val chapterMatch = chapterPattern.find(line)
+        if (chapterMatch != null) {
+            currentChapter = chapterMatch.groupValues[1].toIntOrNull() ?: 0
+            currentVerse = null
+            return@forEach
+        }
+
+        if (currentChapter != chapter) return@forEach
+
+        val verseMatch = versePattern.find(line)
+        if (verseMatch != null) {
+            val number = verseMatch.groupValues[1].toIntOrNull() ?: return@forEach
+            val text = cleanUsfmText(verseMatch.groupValues[2])
+            verses[number] = StringBuilder(text)
+            currentVerse = number
+            return@forEach
+        }
+
+        // Linhas de continuação podem quebrar um versículo comprido.
+        if (currentVerse != null && !line.startsWith("\\")) {
+            val continuation = cleanUsfmText(line)
+            if (continuation.isNotBlank()) {
+                val builder = verses[currentVerse] ?: return@forEach
+                if (builder.isNotEmpty()) builder.append(' ')
+                builder.append(continuation)
+            }
+        }
     }
 
-    val verseLines = lines.drop(chapterMarker + 1).filter { it.isNotBlank() }
-    verseLines.mapIndexed { index, verseText ->
-        BibleVerse(index + 1, verseText)
-    }.also { verses ->
-        if (verses.isEmpty()) {
-            throw IllegalStateException("Nenhum versículo encontrado em ${book.name} $chapter.")
+    verses.mapNotNull { (number, text) ->
+        text.toString().trim().takeIf { it.isNotBlank() }?.let { BibleVerse(number, it) }
+    }.also {
+        if (it.isEmpty()) {
+            throw IllegalStateException("Nenhum versículo foi encontrado em ${book.name} $chapter no arquivo USFM.")
         }
     }
 }
 
+private fun cleanUsfmText(value: String): String {
+    return value
+        .replace(Regex("""\\f .*?\\f\\*"""), "")
+        .replace(Regex("""\\x .*?\\x\\*"""), "")
+        .replace(Regex("""\\w ([^|]+)\\|[^\\\\]*?\\w\\*"""), "$1")
+        .replace(Regex("""\\[a-zA-Z0-9+]+\\*?"""), "")
+        .replace(Regex("""\\[+]?"""), "")
+        .replace(Regex("""\\s+"""), " ")
+        .trim()
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderScreen(
@@ -150,7 +188,7 @@ fun ReaderScreen(
         Column(Modifier.padding(padding).fillMaxSize()) {
             Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
                 Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                    Text("Bíblia Portuguesa Mundial (BPM) • texto offline")
+                    Text("Bíblia Portuguesa Mundial (BPM) • leitura offline")
                     Text(
                         "Tradução em revisão, sem imprimatur. Fonte: eBible.org.",
                         style = MaterialTheme.typography.labelSmall
