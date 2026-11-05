@@ -96,8 +96,9 @@ fun ReaderScreen(
     var verses by remember(book.name, chapter) { mutableStateOf<List<BibleVerse>>(emptyList()) }
     var loading by remember(book.name, chapter) { mutableStateOf(true) }
     var error by remember(book.name, chapter) { mutableStateOf<String?>(null) }
+    var retryCount by remember(book.name, chapter) { mutableIntStateOf(0) }
 
-    LaunchedEffect(book.name, chapter) {
+    LaunchedEffect(book.name, chapter, retryCount) {
         loading = true
         error = null
         verses = emptyList()
@@ -150,8 +151,7 @@ fun ReaderScreen(
                     Text("Verifique sua conexão com a internet e tente novamente.")
                     Button(onClick = {
                         // Re-execução do carregamento pelo efeito ao alterar a chave.
-                        loading = true
-                        error = null
+                        retryCount++
                     }) { Text("Tentar novamente") }
                 }
                 else -> LazyColumn(
