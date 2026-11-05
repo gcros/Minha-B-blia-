@@ -36,7 +36,7 @@ jobs:
           echo "--- Genesis USFM file: $GEN_FILE ---"
           unzip -p /tmp/porbrbsl_usfm.zip "$GEN_FILE" | grep -E '^\\(id|c|v) ' | head -45
           echo '--- Catholic book codes in archive ---'
-          unzip -Z1 /tmp/porbrbsl_usfm.zip | sed -n 's/.*-\\([A-Z0-9]*\\)porbrbsl\\.usfm$/\\1/p' | sort -u
+          unzip -Z1 /tmp/porbrbsl_usfm.zip | sed -n 's/.*-\([A-Z0-9]*\)porbrbsl\.usfm$/\1/p' | sort -u
           cp /tmp/porbrbsl_usfm.zip app/src/main/assets/porbrbsl_usfm.zip
       - name: Build debug APK
         run: gradle assembleDebug
