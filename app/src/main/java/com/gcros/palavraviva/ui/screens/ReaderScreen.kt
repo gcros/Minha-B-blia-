@@ -83,8 +83,8 @@ private suspend fun loadBibleChapter(
     var currentChapter = 0
     var currentVerse: Int? = null
 
-    val chapterPattern = Regex("""^\\c\\s+(\\d+)""")
-    val versePattern = Regex("""^\\v\\s+(\\d+)(?:-\\d+)?\\s*(.*)$""")
+    val chapterPattern = Regex("""^\\c\s+(\d+)""")
+    val versePattern = Regex("""^\\v\s+(\d+)(?:-\d+)?\s*(.*)$""")
 
     source.removePrefix("\uFEFF").lineSequence().forEach { rawLine ->
         val line = rawLine.trim()
@@ -130,12 +130,12 @@ private suspend fun loadBibleChapter(
 
 private fun cleanUsfmText(value: String): String {
     return value
-        .replace(Regex("""\\f .*?\\f\\*"""), "")
-        .replace(Regex("""\\x .*?\\x\\*"""), "")
-        .replace(Regex("""\\w ([^|]+)\\|[^\\\\]*?\\w\\*"""), "$1")
-        .replace(Regex("""\\[a-zA-Z0-9+]+\\*?"""), "")
+        .replace(Regex("""\\f .*?\\f\*"""), "")
+        .replace(Regex("""\\x .*?\\x\*"""), "")
+        .replace(Regex("""\\w ([^|]+)\|[^\\]*?\\w\*"""), "$1")
+        .replace(Regex("""\\[a-zA-Z0-9+]+\*?"""), "")
         .replace(Regex("""\\[+]?"""), "")
-        .replace(Regex("""\\s+"""), " ")
+        .replace(Regex("""\s+"""), " ")
         .trim()
 }
 @OptIn(ExperimentalMaterial3Api::class)
