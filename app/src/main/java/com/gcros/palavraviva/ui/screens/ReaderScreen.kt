@@ -1,5 +1,6 @@
 package com.gcros.palavraviva.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,13 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import java.util.zip.ZipInputStream
 
 private data class BibleVerse(val number: Int, val text: String)
 
@@ -49,39 +48,59 @@ private val bookCodes = mapOf(
     "Apocalipse" to "REV"
 )
 
-private suspend fun loadBibleChapter(book: BibleBook, chapter: Int): List<BibleVerse> =
-    withContext(Dispatchers.IO) {
-        val code = bookCodes[book.name]
-            ?: throw IllegalArgumentException("Código do livro não encontrado.")
-        val url = URL("https://bible.helloao.org/api/porbrbsl/$code/$chapter.simple.json")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 15000
-            readTimeout = 20000
-            setRequestProperty("Accept", "application/json")
-        }
-        try {
-            if (connection.responseCode !in 200..299) {
-                throw IllegalStateException("Fonte bíblica indisponível (HTTP ${connection.responseCode}).")
-            }
-            val body = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            val root = JSONObject(body)
-            val chapterObject = root.optJSONObject("chapter")
-                ?: throw IllegalStateException("Formato de capítulo não reconhecido.")
-            val content = chapterObject.optJSONArray("content") ?: JSONArray()
-            buildList {
-                for (index in 0 until content.length()) {
-                    val item = content.optJSONObject(index) ?: continue
-                    if (item.optString("type") != "verse") continue
-                    val number = item.optInt("number", 0)
-                    val text = item.optString("text", "").trim()
-                    if (number > 0 && text.isNotBlank()) add(BibleVerse(number, text))
+/**
+ * Os capítulos da BPM são arquivos de texto separados dentro do ZIP incluído
+ * em app/src/main/assets. Não há chamadas de rede: a leitura funciona offline.
+ * Cada arquivo contém título, número do capítulo e um parágrafo por versículo.
+ */
+private suspend fun loadBibleChapter(
+    context: Context,
+    book: BibleBook,
+    chapter: Int
+): List<BibleVerse> = withContext(Dispatchers.IO) {
+    val code = bookCodes[book.name]
+        ?: throw IllegalArgumentException("Código do livro não encontrado: ${book.name}")
+
+    val expectedSuffix = "_${code}_${chapter.toString().padStart(2, '0')}_read.txt"
+    var chapterText: String? = null
+
+    context.assets.open("porbrbsl_readaloud.zip").use { asset ->
+        ZipInputStream(asset).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                if (!entry.isDirectory && entry.name.endsWith(expectedSuffix)) {
+                    chapterText = zip.readBytes().toString(Charsets.UTF_8)
+                    break
                 }
+                zip.closeEntry()
+                entry = zip.nextEntry
             }
-        } finally {
-            connection.disconnect()
         }
     }
+
+    val rawText = chapterText
+        ?: throw IllegalStateException(
+            "Capítulo não encontrado no arquivo offline: ${book.name} $chapter."
+        )
+
+    val lines = rawText.removePrefix("\uFEFF")
+        .lines()
+        .map { it.trim() }
+
+    val chapterMarker = lines.indexOfFirst { it.matches(Regex("^$chapter\\.$")) }
+    if (chapterMarker < 0) {
+        throw IllegalStateException("O arquivo de ${book.name} $chapter tem formato inesperado.")
+    }
+
+    val verseLines = lines.drop(chapterMarker + 1).filter { it.isNotBlank() }
+    verseLines.mapIndexed { index, verseText ->
+        BibleVerse(index + 1, verseText)
+    }.also { verses ->
+        if (verses.isEmpty()) {
+            throw IllegalStateException("Nenhum versículo encontrado em ${book.name} $chapter.")
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -93,6 +112,7 @@ fun ReaderScreen(
     isFavorite: Boolean = false,
     onToggleFavorite: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     var verses by remember(book.name, chapter) { mutableStateOf<List<BibleVerse>>(emptyList()) }
     var loading by remember(book.name, chapter) { mutableStateOf(true) }
     var error by remember(book.name, chapter) { mutableStateOf<String?>(null) }
@@ -103,10 +123,9 @@ fun ReaderScreen(
         error = null
         verses = emptyList()
         try {
-            verses = loadBibleChapter(book, chapter)
-            if (verses.isEmpty()) error = "Este capítulo não trouxe versículos da fonte."
+            verses = loadBibleChapter(context, book, chapter)
         } catch (exception: Exception) {
-            error = exception.message ?: "Não foi possível carregar o capítulo."
+            error = exception.message ?: "Não foi possível abrir este capítulo."
         } finally {
             loading = false
         }
@@ -131,7 +150,7 @@ fun ReaderScreen(
         Column(Modifier.padding(padding).fillMaxSize()) {
             Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
                 Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                    Text("Bíblia Portuguesa Mundial (BPM) • domínio público")
+                    Text("Bíblia Portuguesa Mundial (BPM) • texto offline")
                     Text(
                         "Tradução em revisão, sem imprimatur. Fonte: eBible.org.",
                         style = MaterialTheme.typography.labelSmall
@@ -147,12 +166,8 @@ fun ReaderScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(error ?: "Erro ao carregar.")
-                    Text("Verifique sua conexão com a internet e tente novamente.")
-                    Button(onClick = {
-                        // Re-execução do carregamento pelo efeito ao alterar a chave.
-                        retryCount++
-                    }) { Text("Tentar novamente") }
+                    Text(error ?: "Erro ao abrir o capítulo.")
+                    Button(onClick = { retryCount++ }) { Text("Tentar novamente") }
                 }
                 else -> LazyColumn(
                     contentPadding = PaddingValues(20.dp),
