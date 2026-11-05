@@ -32,6 +32,12 @@ jobs:
           curl -fL --retry 3 --retry-delay 2 https://ebible.org/Scriptures/porbrbsl_readaloud.zip -o /tmp/porbrbsl_readaloud.zip
           echo '--- BPM archive contents ---'
           unzip -l /tmp/porbrbsl_readaloud.zip | head -45
+          echo '--- Available book codes ---'
+          unzip -Z1 /tmp/porbrbsl_readaloud.zip | sed -n 's/^porbrbsl_[0-9][0-9][0-9]_\([A-Z0-9]*\)_[0-9][0-9]_read.txt$/\1/p' | sort -u
+          echo '--- Sample Numbers 1 text ---'
+          unzip -p /tmp/porbrbsl_readaloud.zip porbrbsl_004_NUM_01_read.txt | head -60 || true
+          echo '--- Sample Genesis 1 text ---'
+          unzip -p /tmp/porbrbsl_readaloud.zip porbrbsl_002_GEN_01_read.txt | head -35 || true
           cp /tmp/porbrbsl_readaloud.zip app/src/main/assets/porbrbsl_readaloud.zip
       - name: Build debug APK
         run: gradle assembleDebug
