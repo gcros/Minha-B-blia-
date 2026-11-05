@@ -15,8 +15,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import android.content.Context
-import androidx.compose.ui.platform.LocalContext
 import java.util.zip.ZipInputStream
 
 private data class BibleVerse(val number: Int, val text: String)
