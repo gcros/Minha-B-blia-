@@ -66,7 +66,7 @@ private suspend fun loadBibleChapter(
         ZipInputStream(asset).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
-                if (!entry.isDirectory && entry.name.endsWith("_$code.usfm", ignoreCase = true)) {
+                if (!entry.isDirectory && entry.name.contains("-$code", ignoreCase = true) && entry.name.endsWith(".usfm", ignoreCase = true)) {
                     usfmText = zip.readBytes().toString(Charsets.UTF_8)
                     break
                 }
